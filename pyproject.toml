@@ -1,0 +1,14 @@
+[project]
+name = "molab-admet"
+version = "0.1.0"
+description = "ADMET notebook project"
+requires-python = ">=3.12"
+dependencies = [
+    "marimo>=0.15.4",
+]
+
+[tool.marimo.runtime]
+auto_instantiate = false
+
+[tool.marimo.save]
+format_on_save = "true"
