@@ -25,12 +25,15 @@ _ICON_NAMES = [
 ]
 
 
-@lru_cache(maxsize=1)
-def get_icon_uris(icon_dir: pathlib.Path | None = None) -> dict[str, str]:
-    """Return ``{name: data-URI}`` for the bundled bioicons SVGs."""
+@lru_cache(maxsize=2)
+def get_icon_uris(icon_dir: pathlib.Path | None = None, names: tuple[str, ...] | None = None):
+    """Return ``{name: data-URI}`` for the bundled bioicons SVGs.
+
+    ``names`` selects a subset (defaults to all bundled icons).
+    """
     d = pathlib.Path(icon_dir) if icon_dir is not None else _ICON_DIR
     uris: dict[str, str] = {}
-    for name in _ICON_NAMES:
+    for name in names if names is not None else _ICON_NAMES:
         p = d / f"{name}.svg"
         if p.exists():
             b64 = base64.b64encode(p.read_bytes()).decode("ascii")

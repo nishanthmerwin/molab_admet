@@ -208,9 +208,9 @@ def _(mo):
 
 @app.cell
 def _():
-    from openadmet_tdi.widgets import DDIScene, ShiftScene
+    from openadmet_tdi.widgets import DDIScene, ProbeGlowScene, ShiftScene
 
-    return DDIScene, ShiftScene
+    return DDIScene, ProbeGlowScene, ShiftScene
 
 
 @app.cell
@@ -260,6 +260,12 @@ def _(mo):
     **IC50** (concentration that halves the enzyme's product output) → **pIC50**
     = −log10(IC50).
     """)
+    return
+
+
+@app.cell
+def _(ProbeGlowScene, mo):
+    mo.vstack([mo.ui.anywidget(ProbeGlowScene())])
     return
 
 
