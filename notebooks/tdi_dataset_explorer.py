@@ -208,9 +208,9 @@ def _(mo):
 
 @app.cell
 def _():
-    from openadmet_tdi.widgets import DDIScene
+    from openadmet_tdi.widgets import DDIScene, ShiftScene
 
-    return (DDIScene,)
+    return DDIScene, ShiftScene
 
 
 @app.cell
@@ -335,6 +335,28 @@ def _(mo):
     shift = pIC50_TDI(+NADPH) − pIC50_direct(−NADPH)
     ```
     """)
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ### Instant screens miss TDI — the pre-incubation is the point
+
+    A conventional, **instantaneous** screen (mix compound and enzyme, measure
+    straight away) can rank a time‑dependent inhibitor as **clean**: at the
+    moment of measurement, little enzyme has been disabled yet. The loss of
+    activity **builds while the compound pre‑incubates with active CYP
+    (+NADPH)** — so the dose–response you measure *afterwards* has slid left.
+    Flip the toggle and watch one compound go from "sails through" to
+    "flagged".
+    """)
+    return
+
+
+@app.cell
+def _(ShiftScene, mo):
+    mo.vstack([mo.ui.anywidget(ShiftScene())])
     return
 
 
