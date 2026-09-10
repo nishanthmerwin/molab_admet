@@ -11,6 +11,14 @@ cd "$(dirname "$0")/.."
 
 NAME=admet
 
+# Bootstrap opencode auth so it survives container recreation (reads host
+# auth.json into the gitignored .opencode-data/, which entrypoint.sh copies
+# into place inside the container at startup).
+mkdir -p .opencode-data
+if [ -f "$HOME/.local/share/opencode/auth.json" ]; then
+  cp "$HOME/.local/share/opencode/auth.json" .opencode-data/auth.json
+fi
+
 if container ls | grep -q "$NAME"; then
   echo "Container '$NAME' already running. Use scripts/down.sh first to recreate."
   exit 1
@@ -19,6 +27,8 @@ fi
 container run \
   --name "$NAME" \
   -d \
+  -c 6 \
+  -m 18g \
   -v "$(pwd)":/workspace \
   -p 2718:2718 \
   --ssh \

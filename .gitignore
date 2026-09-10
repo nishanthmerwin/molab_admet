@@ -4,3 +4,8 @@ __pycache__/
 .env
 .marimo/
 __marimo__/
+
+# opencode session data (SQLite DB: sessions, messages, todos, permissions)
+.opencode-data/
+
+tmp/*

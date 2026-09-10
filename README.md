@@ -11,13 +11,13 @@ terminal and browser.
 ./scripts/build.sh    # only needed after changing the Containerfile
 ./scripts/up.sh       # start container (idempotent-ish; down.sh to recreate)
 ./scripts/shell.sh    # shell inside the container
-./scripts/marimo.sh   # start marimo editor -> open http://localhost:2718 (see printed URL)
+./scripts/marimo.sh   # open notebooks/tdi_investigator.py in marimo (pass a path to override) -> open http://localhost:2718 (see printed URL)
 ```
 
 Inside the container:
 
 ```bash
-opencode   # launch the agent
+opencode   # launch the agent (resume a past session with ctrl+x then l; new session: ctrl+x n)
 uv run python ...      # run things against the project venv
 ```
 
