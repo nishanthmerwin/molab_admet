@@ -7,6 +7,7 @@ dependencies = [
     "altair>=6.2.2",
     "anywidget>=0.11.0",
     "marimo>=0.15.4",
+    "marimo-chem-utils>=0.2.4",
     "pandas>=3.0.5",
     "plotly>=7.0.0",
     "polars>=1.44.1",
