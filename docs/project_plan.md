@@ -59,7 +59,7 @@ Deliverables: **molab notebook link + short video explainer**. Unrunnable = disq
 
 ## 2. Iterative development loop (how we work)
 
-1. **Single source of truth**: `notebooks/tdi_investigator.py` is THE submission artifact; heavy logic lives in `src/openadmet_tdi/` while developing, gets folded/inlined or imported robustly before freeze.
+1. **Single source of truth**: `notebooks/tdi_dataset_explorer.py` is THE submission artifact; heavy logic lives in `src/openadmet_tdi/` while developing, gets folded/inlined or imported robustly before freeze.
 2. **Precompute/cache contract** (`precompute/` → `data/cache/*.json|parquet`): expensive steps (bulk SOM scans, poses) happen offline; notebook reads cache by default, exposes opt-in live-compute toggles. Guarantees speed + reliability on molab.
 3. **Milestone PRs, tiny steps**: each session ends with: change made → `marimo check .` green → headless run green → git commit (never auto-push without ask).
 4. **Rendered review**: after each milestone you open `uv run marimo edit` locally (or `marimo.sh`) and react to visuals — you're the design judge; I iterate.

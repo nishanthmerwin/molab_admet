@@ -124,20 +124,26 @@
   width: 100%;
   max-width: 64px;
   height: 2px;
+  position: relative;
+}
+
+.ddi-pipe-arrow::before {
+  content: "";
+  position: absolute;
+  inset: 0 8px 0 0;
   border-radius: 2px;
   background: repeating-linear-gradient(
     90deg,
     #94a3b8 0 6px,
     transparent 6px 10px
   );
-  position: relative;
-  animation: ddi-flow 0.9s linear infinite;
+  animation: ddi-flow 1.1s linear infinite;
 }
 
 .ddi-pipe-arrow::after {
   content: "";
   position: absolute;
-  right: -2px;
+  right: 0;
   top: -4px;
   border: 5px solid transparent;
   border-left: 6px solid #94a3b8;
@@ -145,7 +151,7 @@
 
 @keyframes ddi-flow {
   to {
-    background-position: 16px 0;
+    background-position: 10px 0;
   }
 }
 
@@ -160,8 +166,11 @@
 }
 
 .ddi-card.has-inhibitor .ddi-pipe-arrow {
-  animation-play-state: paused;
   opacity: 0.25;
+}
+
+.ddi-card.has-inhibitor .ddi-pipe-arrow::before {
+  animation-play-state: paused;
 }
 
 .ddi-card.has-inhibitor .ddi-pipe-arrow::after {

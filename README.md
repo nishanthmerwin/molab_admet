@@ -11,7 +11,7 @@ terminal and browser.
 ./scripts/build.sh    # only needed after changing the Containerfile
 ./scripts/up.sh       # start container (idempotent-ish; down.sh to recreate)
 ./scripts/shell.sh    # shell inside the container
-./scripts/marimo.sh   # open notebooks/tdi_investigator.py in marimo (pass a path to override) -> open http://localhost:2718 (see printed URL)
+./scripts/marimo.sh   # open notebooks/tdi_dataset_explorer.py in marimo (pass a path to override) -> open http://localhost:2718 (see printed URL)
 ```
 
 Inside the container:

@@ -33,30 +33,17 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    def mermaid(code: str, height: int = 520, theme: str = "default"):
-        """Render a Mermaid flowchart inside an iframe (CDN-loaded, scripts run).
-
-        `mo.Html` strips `<script>` tags, so we embed the diagram in an iframe
-        via `mo.iframe`, where scripts execute and the CDN Mermaid library can
-        render the diagram on load.
-        """
-        _doc = (
-            "<!doctype html><html><head><meta charset='utf-8'>"
-            "<script src='https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js'>"
-            "</script>"
-            "<script>mermaid.initialize({startOnLoad:true,theme:'"
-            + theme
-            + "',securityLevel:'loose'});</script>"
-            "</head><body style='margin:0;background:#fff;padding:16px;"
-            "display:flex;justify-content:center;'>"
-            "<div class='mermaid' style='max-width:100%;'>"
-            + code
-            + "</div></body></html>"
-        )
-        return mo.iframe(_doc, width="100%", height=f"{height}px")
-
-    return (mermaid,)
+def _():
+    # Shared look & size for the builtin mo.mermaid diagrams (bundled, no CDN).
+    # fontSize drives the diagram size; colors mirror mermaid's classic "default".
+    MMD_THEME = {
+        "primaryColor": "#ECECFF",
+        "primaryBorderColor": "#9370DB",
+        "primaryTextColor": "#333333",
+        "lineColor": "#333333",
+        "fontSize": "21px",
+    }
+    return (MMD_THEME,)
 
 
 @app.cell
@@ -170,13 +157,10 @@ def _(mo):
     **Source:** [`openadmet/cyp-challenge-train-test`](https://huggingface.co/datasets/openadmet/cyp-challenge-train-test)
     · Challenge: OpenADMET CYP Inhibition Blind Challenge · **License:** Apache‑2.0
 
-    This notebook is a **deep‑dive into the raw data** that the main
-    *CYP TDI Investigator* notebook will draw its flagship compound and case
-    studies from. It focuses on two questions:
-
-    1. **How *frequent* is TDI in this dataset?** Across isoforms and compounds.
-    2. **How is TDI *classified* here?** The exact definition that turns a pair of
-       IC50 measurements into a True/False `is_TDI` label.
+    This notebook is a **deep‑dive into the raw data** — anchored by an
+    interactive decision‑boundary explorer (§1) with on‑demand chemical
+    structures. The remaining sections (§A1–A7) form an appendix: how the
+    dataset is shaped, how the labels are derived, and the supporting views.
 
     **Epistemic legend:** 🔵 OBSERVED (measured experiment) · 🟠 PREDICTED
     (derived rule / model) · 🟢 PROPOSED (what we could do next).
@@ -218,7 +202,7 @@ def _(DDIScene, mo):
     _desc = mo.md(
         "**Cytochromes P450 (CYPs)** are the liver enzymes that break down most "
         "drugs. When we test a compound, we want to know: *does it stop a CYP "
-        'from doing its job?* If it does, co‑administered drugs that rely on '
+        "from doing its job?* If it does, co‑administered drugs that rely on "
         'that CYP (the **"victim" drug**) clear more slowly, which can push '
         "them into toxic territory — a **drug–drug interaction (DDI)**."
         "\n\n"
@@ -270,46 +254,37 @@ def _(ProbeGlowScene, mo):
 
 
 @app.cell
-def _(D, alt, mo, pd, theme_sel):
-    alt.theme.enable(theme_sel.value)
-    _sc = D["single_concentration"]
-    _sc = _sc.rename(columns={"enzyme": "isoform"})[
-        ["isoform", "log2fc_estimate"]
-    ].dropna()
-    _chart = (
-        alt.Chart(_sc)
-        .mark_boxplot(size=40, extent="min-max")
-        .encode(
-            y=alt.Y("isoform:N", sort=["CYP1A2", "CYP2C9", "CYP2D6", "CYP3A4"], title=None),
-            x=alt.X(
-                "log2fc_estimate:Q",
-                title="log2 fold-change in product signal (primary screen, 50 \u00b5M)",
-            ),
-            color=alt.Color("isoform:N", scale=alt.Scale(scheme="set2"), legend=None),
-            tooltip=["isoform"],
-        )
-        .properties(width=620, height=300)
+def _(MMD_THEME, mo):
+    _writeup = mo.md(r"""
+    ### Experimental Design
+
+    For every compound, the assay runs **two pre‑incubations in parallel** —
+    one with the CYP switched **off** (−NADPH), one switched **on** (+NADPH) —
+    then traces a 12‑point dose–response in each arm. Because only the +NADPH
+    arm lets the enzyme metabolise the compound, a *time‑dependent inhibitor*
+    reveals itself as a leftward slide of the dose–response: a lower IC50
+    (higher pIC50) after active pre‑incubation. That **shift** between arms is
+    the dataset's TDI readout, with `is_TDI = True` called at a ≥2‑fold
+    potency gain.
+    """)
+    _diagram = mo.center(
+        mo.mermaid(
+            """flowchart TD
+    C["Compound"] --> A["Incubate compound + CYP<br/>two arms, same plate, 30 min"]
+    A --> D1["<b>DIRECT arm</b> ( –NADPH )<br/>CYP <b>switched off</b><br/>no metabolism<br/>&rarr; reversible<br/>binding only"]
+    A --> T1["<b>TDI arm</b> ( +NADPH )<br/>CYP <b>switched on</b><br/>metabolises compound<br/>&rarr; reactive<br/>species may disable CYP"]
+    D1 --> D2["12-pt dose-response<br/>&rarr; pIC50 direct"]
+    T1 --> T2["12-point dose-response<br/>&rarr; pIC50 TDI"]
+    D2 --> S{"shift = pIC50 TDI<br/>&minus; pIC50 direct"}
+    T2 --> S
+    S -->|"&ge; 2-fold (shift &ge; 0.301)"| P["is_TDI = True"]
+    S -->|"no shift"| N["is_TDI = False"]
+    """,
+            theme="base",
+            theme_variables=MMD_THEME,
+        ),
     )
-    _zeroline = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(
-        color="#666", strokeWidth=1.2
-    ).encode(x="x:Q")
-    mo.vstack(
-        [
-            mo.md(
-                "### Visualising the readout: 'less product = the enzyme is inhibited'"
-            ),
-            mo.md(
-                "**Real data:** the single-concentration primary screen. For each of "
-                "the ~17.5k compound\u00d7enzyme tests, the readout is the **log2 "
-                "fold-change in product signal** relative to a no-compound control. "
-                "A bar sitting **below 0** means the compound made the enzyme produce "
-                "*less* product — i.e. it inhibited that CYP. The more negative, the "
-                "stronger the inhibition. (Box = middle 50% of compounds; whiskers = "
-                "min/max.)"
-            ),
-            mo.ui.altair_chart(_chart + _zeroline),
-        ]
-    )
+    mo.vstack([_writeup, _diagram])
     return
 
 
@@ -347,7 +322,7 @@ def _(mo):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ### Instant screens miss TDI — the pre-incubation is the point
+    ### Instant screens miss TDI — the pre‑incubation is the point
 
     A conventional, **instantaneous** screen (mix compound and enzyme, measure
     straight away) can rank a time‑dependent inhibitor as **clean**: at the
@@ -367,6 +342,205 @@ def _(ShiftScene, mo):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ## 1 · Explore the dataset: the decision boundary
+
+    The core explorer. Every point is a compound measured in **both arms**; the
+    dashed green line is the **2‑fold shift boundary** (`y = x + 0.301`), purple
+    and blue mark the direct‑arm (`4`) and TDI‑arm (`4.3`) detection floors. Pick
+    an isoform, toggle positives‑only, then **brush‑select points** — the
+    selected compounds' chemical structures are drawn below the table.
+    """)
+    return
+
+
+@app.cell
+def _():
+    from rdkit import Chem
+    from rdkit.Chem import Draw
+
+    def structures_grid(names, smiles, mols_per_row=4, sub_img=(200, 150)):
+        """PIL grid of RDKit structures for (name, smiles) pairs; None if nothing draws."""
+        pairs = []
+        for name, smi in zip(names, smiles):
+            mol = Chem.MolFromSmiles(smi or "")
+            if mol is not None:
+                pairs.append((mol, str(name)))
+        if not pairs:
+            return None
+        return Draw.MolsToGridImage(
+            [m for m, _ in pairs],
+            molsPerRow=mols_per_row,
+            subImgSize=sub_img,
+            legends=[n for _, n in pairs],
+        )
+
+    return (structures_grid,)
+
+
+@app.cell
+def _(ISO, mo):
+    iso_sel = mo.ui.dropdown(options=ISO, value="CYP3A4", label="Isoform")
+    only_pos = mo.ui.checkbox(value=True, label="Only TDI-positive")
+    cursor_sel = mo.ui.radio(
+        options=["brush", "click", "pan"],
+        value="brush",
+        label="Cursor",
+        inline=True,
+    )
+    return cursor_sel, iso_sel, only_pos
+
+
+@app.cell
+def _(
+    alt,
+    classify_batch,
+    cursor_sel,
+    df_tdi,
+    iso_sel,
+    mo,
+    only_pos,
+    pd,
+    theme_sel,
+):
+    alt.theme.enable(theme_sel.value)
+    _iso = iso_sel.value
+    _out, _rule, _direct, _tdi, _shift = classify_batch(df_tdi, _iso)
+    _lab = f"{_iso}_is_TDI"
+    _has_labels = _lab in df_tdi.columns
+    _f = df_tdi.loc[_out, ["Molecule_Name", "SMILES"]].copy()
+    _f["direct"] = _direct
+    _f["tdi_condition"] = _tdi
+    _f["shift"] = _shift
+    _f["is_TDI"] = (
+        df_tdi.loc[_out, _lab].astype(bool) if _has_labels else _rule
+    )
+    if only_pos.value:
+        _f = _f[_f["is_TDI"]]
+    _pts = (
+        alt.Chart(_f)
+        .mark_point(opacity=0.6, filled=True, size=30)
+        .encode(
+            x=alt.X(
+                "direct:Q",
+                title="pIC50 direct (–NADPH)",
+                scale=alt.Scale(domain=[1, 8]),
+            ),
+            y=alt.Y(
+                "tdi_condition:Q",
+                title="pIC50 TDI (+NADPH)",
+                scale=alt.Scale(domain=[1, 8]),
+            ),
+            color=alt.Color(
+                "is_TDI:N",
+                scale=alt.Scale(
+                    domain=[False, True], range=["#7f7f7f", "#d62728"]
+                ),
+                title="is_TDI",
+            ),
+            tooltip=[
+                "Molecule_Name",
+                "SMILES",
+                "direct",
+                "tdi_condition",
+                "shift",
+            ],
+        )
+        .properties(width=560, height=460)
+    )
+    _diag = (
+        alt.Chart(pd.DataFrame({"x": [1, 7.7], "y": [1.301, 8.0]}))
+        .mark_line(color="#2ca02c", strokeDash=[4, 3])
+        .encode(x="x:Q", y="y:Q")
+    )
+    _vline = (
+        alt.Chart(pd.DataFrame({"x": [4]}))
+        .mark_rule(color="#9467bd", strokeDash=[4, 3])
+        .encode(x="x:Q")
+    )
+    _hline = (
+        alt.Chart(pd.DataFrame({"y": [4.3]}))
+        .mark_rule(color="#1f77b4", strokeDash=[4, 3])
+        .encode(y="y:Q")
+    )
+    _title = (
+        f"{_iso} — "
+        + "shipped is_TDI labels"
+        if _has_labels
+        else f"{_iso} — coloured by the classification rule (no shipped labels)"
+    )
+    _layered = _pts + _diag + _vline + _hline
+    if cursor_sel.value == "brush":
+        _layered = _layered.add_params(
+            alt.selection_interval(encodings=["x", "y"])
+        )
+        scat = mo.ui.altair_chart(
+            _layered.properties(title=_title),
+            chart_selection=False,
+            legend_selection=False,
+        )
+    elif cursor_sel.value == "click":
+        _layered = _layered.add_params(alt.selection_point(on="click"))
+        scat = mo.ui.altair_chart(
+            _layered.properties(title=_title),
+            chart_selection=False,
+            legend_selection=False,
+        )
+    else:
+        scat = mo.ui.altair_chart(
+            _layered.properties(title=_title).interactive(),
+            chart_selection=False,
+            legend_selection=False,
+        )
+    scatter_points = _f
+    mo.vstack([mo.hstack([iso_sel, only_pos, cursor_sel]), scat])
+    return scat, scatter_points
+
+
+@app.cell
+def _(mo, scat, scatter_points, structures_grid):
+    _selection = scat.selections
+    _selected = (
+        scat.apply_selection(scatter_points) if _selection else scatter_points
+    )
+    _hint = (
+        ""
+        if _selection
+        else " — showing the 8 strongest shifts; brush‑select points to isolate yours"
+    )
+    _cap = _selected.sort_values("shift", ascending=False).head(8)
+    _img = structures_grid(_cap["Molecule_Name"], _cap["SMILES"])
+    mo.vstack(
+        [
+            mo.md(f"**{len(_selected):,} compounds** selected{_hint}"),
+            mo.ui.table(
+                _selected.sort_values("shift", ascending=False),
+                selection=None,
+                page_size=10,
+            ),
+            mo.image(_img) if _img is not None else mo.md(""),
+        ]
+    )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ---
+
+    ## Appendix — supporting analyses
+
+    The rest of the notebook: how the dataset is shaped, how the labels are
+    derived and validated, and the remaining views (real‑data shift example,
+    pipeline diagrams, shift distribution, flagship scanner). Nothing here is
+    needed for the core explorer above.
+    """)
+    return
+
+
+@app.cell
 def _(D, alt, mo, pd, theme_sel):
     alt.theme.enable(theme_sel.value)
     _iso = "CYP3A4"
@@ -375,7 +549,7 @@ def _(D, alt, mo, pd, theme_sel):
     _row = _t[_t["Molecule_Name"] == _name].iloc[0]
     _rows = pd.DataFrame(
         {
-            "arm": ["direct (\u2212NADPH)", "TDI (+NADPH)"],
+            "arm": ["direct (−NADPH)", "TDI (+NADPH)"],
             "pIC50": [
                 _row[f"{_iso}_pIC50_direct_inhibition"],
                 _row[f"{_iso}_pIC50_TDI_condition"],
@@ -404,7 +578,7 @@ def _(D, alt, mo, pd, theme_sel):
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(
-                    domain=["direct (\u2212NADPH)", "TDI (+NADPH)"],
+                    domain=["direct (−NADPH)", "TDI (+NADPH)"],
                     range=["#4c78a8", "#e45756"],
                 ),
                 legend=None,
@@ -419,25 +593,44 @@ def _(D, alt, mo, pd, theme_sel):
             x=alt.X("pIC50:Q", title=None),
             x2="CI high:Q",
             y="arm:N",
-            color=alt.Color("arm:N", scale=alt.Scale(domain=["direct (\u2212NADPH)", "TDI (+NADPH)"], range=["#4c78a8", "#e45756"]), legend=None),
+            color=alt.Color(
+                "arm:N",
+                scale=alt.Scale(
+                    domain=["direct (−NADPH)", "TDI (+NADPH)"],
+                    range=["#4c78a8", "#e45756"],
+                ),
+                legend=None,
+            ),
             tooltip=["arm", "CI low", "CI high"],
         )
     )
-    _gap = alt.Chart(pd.DataFrame({"x0": [_rows["pIC50"].iloc[0]], "x1": [_rows["pIC50"].iloc[1]], "y": [0.225]})).mark_rule(
-        color="#666", strokeDash=[5, 4]
-    ).encode(x="x0:Q", x2="x1:Q", y="y:Q")
+    _gap = (
+        alt.Chart(
+            pd.DataFrame(
+                {
+                    "x0": [_rows["pIC50"].iloc[0]],
+                    "x1": [_rows["pIC50"].iloc[1]],
+                    "y": [0.225],
+                }
+            )
+        )
+        .mark_rule(color="#666", strokeDash=[5, 4])
+        .encode(x="x0:Q", x2="x1:Q", y="y:Q")
+    )
     _chart = (_err + _pts + _gap).properties(width=620, height=220)
     mo.vstack(
         [
-            mo.md("### Visualising the shift on real data: `%s` (CYP3A4)" % _name),
+            mo.md(
+                "### Visualising the shift on real data: `%s` (CYP3A4)" % _name
+            ),
             mo.md(
                 "A **real** TDI-positive compound from this dataset, with its two "
-                "measured potencies and 95% confidence intervals (CI). Its dose\u2011"
+                "measured potencies and 95% confidence intervals (CI). Its dose‑"
                 "response is **more potent in the +NADPH (TDI) arm** than in the "
-                "\u2212NADPH (direct) arm — the measured pIC50 jumps from "
-                f"**{_rows['pIC50'].iloc[0]:.2f} \u2192 {_rows['pIC50'].iloc[1]:.2f}**, "
+                "−NADPH (direct) arm — the measured pIC50 jumps from "
+                f"**{_rows['pIC50'].iloc[0]:.2f} → {_rows['pIC50'].iloc[1]:.2f}**, "
                 f"a shift of **+{_shift:.2f} log10** "
-                f"(= {10**_shift:.1f}\u00d7 more potent IC50) once the CYP was allowed "
+                f"(= {10**_shift:.1f}× more potent IC50) once the CYP was allowed "
                 "to metabolise it. The CIs do not overlap, so this is a confident TDI "
                 "call. This *is* the IC50 shift that the whole dataset's `is_TDI` "
                 "labels are built from."
@@ -451,51 +644,32 @@ def _(D, alt, mo, pd, theme_sel):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ### The two arms, the tiering funnel, the decision rule — in one place
+    ### The tiering funnel, the decision rule — the rest of the pipeline
 
-    Now that the concepts are clear, here is the full pipeline at a glance.
-    (Mermaid renders from a CDN, so it needs internet access.)
+    The remaining pieces of the pipeline, at a glance.
     """)
     return
 
 
 @app.cell
-def _(mermaid, mo):
-    mo.md("### The two‑arm design — where the shift comes from")
-    mermaid(
-        """flowchart TD
-    C["Compound"] --> A["Incubate compound + CYP<br/>two arms, same plate, 30 min"]
-    A --> D1["<b>DIRECT arm</b> ( –NADPH )<br/>CYP <b>switched off</b><br/>no metabolism<br/>&rarr; reversible binding only"]
-    A --> T1["<b>TDI arm</b> ( +NADPH )<br/>CYP <b>switched on</b><br/>metabolises compound<br/>&rarr; reactive species may disable CYP"]
-    D1 --> D2["12-pt dose-response<br/>&rarr; pIC50 direct"]
-    T1 --> T2["12-pt dose-response<br/>&rarr; pIC50 TDI"]
-    D2 --> S{"shift = pIC50 TDI<br/>&minus; pIC50 direct"}
-    T2 --> S
-    S -->|"&ge; 2-fold (shift &ge; 0.301)"| P["is_TDI = True"]
-    S -->|"no shift"| N["is_TDI = False"]
-    """
-    )
-    return
-
-
-@app.cell
-def _(mermaid, mo):
-    mo.md("### Tiering funnel — from library to labels")
-    mermaid(
+def _(MMD_THEME, mo):
+    _diagram = mo.mermaid(
         """flowchart LR
     L["<b>Library</b><br/>Enamine DDS10 (~10k)<br/>+ ~1k FDA drugs"] --> P["<b>Primary screen</b><br/>single conc 50 &micro;M<br/><b>TDI arm only</b><br/>all 4 isoforms"]
     P --> H["Hits promoted<br/>~1.5k each 1A2/2C9/2D6<br/>~2.25k for 3A4"]
     H --> DRC["<b>12-point dose-response</b><br/>both arms<br/>Bayesian fit &rarr; pIC50 &plusmn; 95% CI"]
     DRC --> LBL["<b>Call TDI</b><br/>from the IC50 shift"]
-    """
+    """,
+        theme="base",
+        theme_variables=MMD_THEME,
     )
+    mo.vstack([mo.md("### Tiering funnel — from library to labels"), _diagram])
     return
 
 
 @app.cell
-def _(mermaid, mo):
-    mo.md("### Labeling decision rule (Method 1, the shipped one)")
-    mermaid(
+def _(MMD_THEME, mo):
+    _diagram = mo.mermaid(
         """flowchart TD
     A["For each isoform<br/>pIC50 direct &amp; pIC50 TDI"] --> B{"direct &gt; 4?<br/>(measurable direct activity)"}
     B -->|"Yes"| C{"shift &gt; 0.301?<br/>(2-fold potency gain)"}
@@ -504,22 +678,31 @@ def _(mermaid, mo):
     B -->|"No (below-detection)"| D{"pIC50 TDI &gt; 4.3?<br/>(measurable in TDI arm)"}
     D -->|"Yes"| T
     D -->|"No"| F
-    """
+    """,
+        theme="base",
+        theme_variables=MMD_THEME,
+    )
+    mo.vstack(
+        [mo.md("### Labeling decision rule (Method 1, the shipped one)"), _diagram]
     )
     return
 
 
 @app.cell
-def _(mermaid, mo):
-    mo.md("### pIC50 vs Emax — what each shipped config emphasises")
-    mermaid(
+def _(MMD_THEME, mo):
+    _diagram = mo.mermaid(
         """flowchart TD
     M["Dose-response<br/>(both arms, 4 isoforms)"] --> F["Bayesian fit"]
     F --> PIC["<b>pIC50</b> = potency<br/>(curve position)"]
     F --> EMAX["<b>Emax</b> = efficacy<br/>(curve max, EmaxVsPosCtrl)"]
     PIC --> TC["<b>TDI config</b><br/>labels 2D6 &amp; 3A4<br/>ships shift columns"]
     EMAX --> EC["<b>Emax config</b><br/>labels all 4 isoforms<br/>no shift columns"]
-    """
+    """,
+        theme="base",
+        theme_variables=MMD_THEME,
+    )
+    mo.vstack(
+        [mo.md("### pIC50 vs Emax — what each shipped config emphasises"), _diagram]
     )
     return
 
@@ -543,7 +726,7 @@ def _(D, mo, pd):
     _unique = len(set().union(*[set(D[k]["Molecule_Name"]) for k in D]))
     mo.vstack(
         [
-            mo.md("## 1 · Dataset at a glance"),
+            mo.md("### 1 · Dataset at a glance"),
             mo.md(
                 "Five CSV files (the five configs of the HF dataset) were downloaded "
                 f"into `data/raw/openadmet_cyp_challenge/`. **{_unique:,} unique** "
@@ -564,7 +747,11 @@ def _(D, mo, pd):
         {
             "isoform": ISO,
             "labeled (TDI config)": [
-                int(df_tdi.get(f"{k}_is_TDI", pd.Series(dtype=bool)).notna().sum())
+                int(
+                    df_tdi.get(f"{k}_is_TDI", pd.Series(dtype=bool))
+                    .notna()
+                    .sum()
+                )
                 for k in ISO
             ],
             "labeled (Emax config)": [
@@ -574,7 +761,7 @@ def _(D, mo, pd):
     )
     mo.vstack(
         [
-            mo.md("## 2 · What labels does the dataset ship?"),
+            mo.md("### 2 · What labels does the dataset ship?"),
             mo.md(
                 "The **Emax config** carries an explicit `is_TDI` boolean for **all four** "
                 "isoforms; the **TDI config** ships labels for **CYP2D6 and CYP3A4 only** "
@@ -589,7 +776,7 @@ def _(D, mo, pd):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ## 3 · How frequent is TDI?
+    ### 3 · How frequent is TDI?
 
     The headline question. A compound counts as a **TDI positive** if it is labelled
     `True` for *any* isoform.
@@ -607,11 +794,17 @@ def _(ISO, alt, df_emax, mo, pd, theme_sel):
     pos_by_iso = pd.DataFrame(
         {
             "isoform": ISO,
-            "positive": [int(df_emax[f"{k}_is_TDI"].fillna(False).sum()) for k in ISO],
-            "labeled": [int(df_emax[f"{k}_is_TDI"].notna().sum()) for k in ISO],
+            "positive": [
+                int(df_emax[f"{k}_is_TDI"].fillna(False).sum()) for k in ISO
+            ],
+            "labeled": [
+                int(df_emax[f"{k}_is_TDI"].notna().sum()) for k in ISO
+            ],
         }
     )
-    pos_by_iso["rate (labeled)"] = pos_by_iso["positive"] / pos_by_iso["labeled"]
+    pos_by_iso["rate (labeled)"] = (
+        pos_by_iso["positive"] / pos_by_iso["labeled"]
+    )
     _chart = (
         alt.Chart(pos_by_iso)
         .mark_bar()
@@ -643,16 +836,18 @@ def _(ISO, badge, df_emax, mo, pd):
     _ppos = per_compound[per_compound["any_positive"]]
     mo.vstack(
         [
-            mo.md("Across the **{}**-compound training set (Emax config, n={:,}):".format(
-                "6,145", len(df_emax)
-            )),
             mo.md(
-                f"**{len(_ppos):,} compounds ({len(_ppos)/len(df_emax):.1%}) are "
+                "Across the **{}**-compound training set (Emax config, n={:,}):".format(
+                    "6,145", len(df_emax)
+                )
+            ),
+            mo.md(
+                f"**{len(_ppos):,} compounds ({len(_ppos) / len(df_emax):.1%}) are "
                 "TDI-positive for at least one isoform.**"
             ),
             mo.md(
                 f"Multi-isoform TDI is rare: "
-                f"**{int((per_compound['n_positive_isoforms']>=2).sum())} compounds** "
+                f"**{int((per_compound['n_positive_isoforms'] >= 2).sum())} compounds** "
                 f"are positive for ≥2 isoforms ({_ppos['n_positive_isoforms'].mean():.2f} "
                 "positives per positive compound on average)."
             ),
@@ -673,7 +868,9 @@ def _(alt, badge, mo, per_compound, theme_sel):
                 alt.Chart(per_compound)
                 .mark_bar()
                 .encode(
-                    x=alt.X("n_positive_isoforms:O", title="Positive isoforms"),
+                    x=alt.X(
+                        "n_positive_isoforms:O", title="Positive isoforms"
+                    ),
                     y=alt.Y("count()", title="compounds"),
                     color=alt.condition(
                         "datum.n_positive_isoforms > 0",
@@ -691,7 +888,7 @@ def _(alt, badge, mo, per_compound, theme_sel):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ## 4 · How is TDI *classified* here?
+    ### 4 · How is TDI *classified* here?
 
     This is the mechanism behind the labels. It is an **IC50‑shift** design:
 
@@ -734,7 +931,12 @@ def _(mo):
 
 @app.cell
 def _():
-    ISO_ABBREV = {"CYP1A2": "1A2", "CYP2C9": "2C9", "CYP2D6": "2D6", "CYP3A4": "3A4"}
+    ISO_ABBREV = {
+        "CYP1A2": "1A2",
+        "CYP2C9": "2C9",
+        "CYP2D6": "2D6",
+        "CYP3A4": "3A4",
+    }
 
     def classify_batch(df, iso):
         dcol = f"{iso}_pIC50_direct_inhibition"
@@ -780,153 +982,9 @@ def _(classify_batch, df_tdi, mo, pd):
 
 
 @app.cell
-def _(ISO, mo):
-    iso_sel = mo.ui.dropdown(options=ISO, value="CYP3A4", label="Isoform")
-    return (iso_sel,)
-
-
-@app.cell
 def _(mo):
     mo.md(r"""
-    ### Visualise the decision boundary
-
-    Measurement space: **x = pIC50 direct**, **y = pIC50 TDI condition**, coloured
-    by shipped label. Points *above* the `y = x + 0.301` line are positives; points
-    with `direct <= 4` that reach `y > 4.3` are "inferred positives."
-    """)
-    return
-
-
-@app.cell
-def _(alt, classify_batch, df_tdi, iso_sel, mo, pd, theme_sel):
-    alt.theme.enable(theme_sel.value)
-    _iso = iso_sel.value
-    _out, _rule, _direct, _tdi, _shift = classify_batch(df_tdi, _iso)
-    _lab = f"{_iso}_is_TDI"
-    _frame = df_tdi.loc[_out, ["SMILES", _lab]].copy()
-    _frame["direct"] = _direct
-    _frame["tdi_condition"] = _tdi
-    _frame["shift"] = _shift
-    _frame["label"] = _frame[_lab].astype(bool)
-    _base = (
-        alt.Chart(_frame)
-        .mark_point(opacity=0.35, size=28, filled=True)
-        .encode(
-            x=alt.X(
-                "direct:Q",
-                scale=alt.Scale(domain=[1, 8]),
-                title="pIC50 direct (–NADPH)",
-            ),
-            y=alt.Y(
-                "tdi_condition:Q",
-                scale=alt.Scale(domain=[1, 8]),
-                title="pIC50 TDI (+NADPH)",
-            ),
-            color=alt.Color(
-                "label:N",
-                scale=alt.Scale(domain=[False, True], range=["#7f7f7f", "#d62728"]),
-                title="is_TDI",
-            ),
-            tooltip=["SMILES", "direct", "tdi_condition", "shift"],
-        )
-    )
-    _shift_line = (
-        alt.Chart(pd.DataFrame({"y0": [0], "y1": [8]}))
-        .mark_rule(color="#2ca02c", strokeDash=[4, 3])
-        .encode(y="y0:Q", y2="y1:Q")
-    )
-    _vline = alt.Chart(pd.DataFrame({"x": [4]})).mark_rule(
-        color="#9467bd", strokeDash=[4, 3]
-    ).encode(x="x:Q")
-    _hline = alt.Chart(pd.DataFrame({"y": [4.3]})).mark_rule(
-        color="#1f77b4", strokeDash=[4, 3]
-    ).encode(y="y:Q")
-    _chart = (_base + _shift_line + _vline + _hline).properties(width=560, height=420)
-    mo.vstack(
-        [
-            iso_sel,
-            mo.md(
-                f"### {_iso} — shift line `y=x+0.301` (green), `direct=4` (purple), "
-                "`TDI=4.3` (blue)"
-            ),
-            mo.ui.altair_chart(_chart),
-        ]
-    )
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""
-    ## 5 · Interactive compound explorer
-
-    Brush‑select points on the left scatter to see the matching compounds in the
-    table on the right. Pick the isoform and toggle to show only positives.
-    """)
-    return
-
-
-@app.cell
-def _(ISO, mo):
-    iso2_sel = mo.ui.dropdown(options=ISO, value="CYP3A4", label="Isoform")
-    only_pos = mo.ui.checkbox(value=True, label="Only TDI-positive")
-    return iso2_sel, only_pos
-
-
-@app.cell
-def _(alt, classify_batch, df_tdi, iso2_sel, mo, only_pos, theme_sel):
-    alt.theme.enable(theme_sel.value)
-    _out, _rule, _direct, _tdi, _shift = classify_batch(df_tdi, iso2_sel.value)
-    _lab = f"{iso2_sel.value}_is_TDI"
-    _f = df_tdi.loc[_out, ["Molecule_Name", "SMILES", _lab]].copy()
-    _f["direct"] = _direct
-    _f["tdi_condition"] = _tdi
-    _f["shift"] = _shift
-    _f["is_TDI"] = _f[_lab].astype(bool)
-    if only_pos.value:
-        _f = _f[_f["is_TDI"]]
-    _pts = (
-        alt.Chart(_f)
-        .mark_point(opacity=0.6, filled=True, size=30)
-        .encode(
-            x=alt.X("direct:Q", title="pIC50 direct"),
-            y=alt.Y("tdi_condition:Q", title="pIC50 TDI condition"),
-            color=alt.Color(
-                "is_TDI:N",
-                scale=alt.Scale(domain=[False, True], range=["#7f7f7f", "#d62728"]),
-                legend=None,
-            ),
-            tooltip=["Molecule_Name", "SMILES", "direct", "tdi_condition", "shift"],
-        )
-        .properties(width=430, height=400)
-        .interactive()
-    )
-    scat = mo.ui.altair_chart(_pts)
-    scatter_points = _f
-    mo.hstack([
-        mo.vstack([iso2_sel, only_pos, scat]),
-        mo.md(f"**{len(scatter_points)} compounds** in view"),
-    ])
-    return scat, scatter_points
-
-
-@app.cell
-def _(mo, scat, scatter_points):
-    _selected = scat.value
-    if _selected is None or len(_selected) == 0:
-        _selected = scatter_points
-    mo.ui.table(
-        _selected.sort_values("shift", ascending=False),
-        selection=None,
-        page_size=10,
-    )
-    return
-
-
-@app.cell
-def _(mo):
-    mo.md(r"""
-    ## 6 · The 2‑fold shift cut‑off
+    ### 6 · The 2‑fold shift cut‑off
 
     Distribution of `shift` (pIC50_TDI − pIC50_direct) for labelled compounds, split
     by class. The dashed line at `0.301` (= log10 2) is exactly where the positives
@@ -937,7 +995,9 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    iso3_sel = mo.ui.dropdown(options=["CYP3A4", "CYP2D6"], value="CYP3A4", label="Isoform")
+    iso3_sel = mo.ui.dropdown(
+        options=["CYP3A4", "CYP2D6"], value="CYP3A4", label="Isoform"
+    )
     return (iso3_sel,)
 
 
@@ -954,19 +1014,27 @@ def _(alt, classify_batch, df_tdi, iso3_sel, mo, pd, theme_sel):
         alt.Chart(_f)
         .mark_bar(opacity=0.7)
         .encode(
-            alt.X("shift:Q", bin=alt.Bin(maxbins=80), title="shift = pIC50 TDI − pIC50 direct"),
+            alt.X(
+                "shift:Q",
+                bin=alt.Bin(maxbins=80),
+                title="shift = pIC50 TDI − pIC50 direct",
+            ),
             alt.Y("count()", title="compounds"),
             alt.Color(
                 "label:N",
-                scale=alt.Scale(domain=[False, True], range=["#7f7f7f", "#d62728"]),
+                scale=alt.Scale(
+                    domain=[False, True], range=["#7f7f7f", "#d62728"]
+                ),
                 title="is_TDI",
             ),
         )
         .properties(width=620, height=320)
     )
-    _cut = alt.Chart(pd.DataFrame({"x": [0.301]})).mark_rule(
-        color="#2ca02c", strokeWidth=2
-    ).encode(x="x:Q")
+    _cut = (
+        alt.Chart(pd.DataFrame({"x": [0.301]}))
+        .mark_rule(color="#2ca02c", strokeWidth=2)
+        .encode(x="x:Q")
+    )
     mo.vstack(
         [
             iso3_sel,
@@ -982,7 +1050,7 @@ def _(alt, classify_batch, df_tdi, iso3_sel, mo, pd, theme_sel):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ## 7 · Flagship candidate scanner
+    ### 7 · Flagship candidate scanner
 
     For the *CYP TDI Investigator* storyline we want **mechanistically interesting**
     TDI‑positives — compounds with a **strong IC50 shift** (a clear, confident
@@ -994,7 +1062,9 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    iso4_sel = mo.ui.dropdown(options=["CYP3A4", "CYP2D6"], value="CYP3A4", label="Isoform")
+    iso4_sel = mo.ui.dropdown(
+        options=["CYP3A4", "CYP2D6"], value="CYP3A4", label="Isoform"
+    )
     top_n = mo.ui.slider(5, 50, value=20, label="Top N by shift")
     return iso4_sel, top_n
 
@@ -1004,19 +1074,29 @@ def _(alt, classify_batch, df_tdi, iso4_sel, mo, theme_sel, top_n):
     alt.theme.enable(theme_sel.value)
     _out, _rule, _direct, _tdi, _shift = classify_batch(df_tdi, iso4_sel.value)
     _lab = f"{iso4_sel.value}_is_TDI"
-    _f = df_tdi.loc[_out, ["Molecule_Name", "SMILES", _lab]].copy().reset_index(drop=True)
+    _f = (
+        df_tdi.loc[_out, ["Molecule_Name", "SMILES", _lab]]
+        .copy()
+        .reset_index(drop=True)
+    )
     _f["direct"] = _direct.reset_index(drop=True)
     _f["tdi_condition"] = _tdi.reset_index(drop=True)
     _f["shift"] = _shift.reset_index(drop=True)
     _f["is_TDI"] = _f[_lab].astype(bool)
-    _ranked = _f[_f["is_TDI"]].sort_values("shift", ascending=False).head(top_n.value)
+    _ranked = (
+        _f[_f["is_TDI"]]
+        .sort_values("shift", ascending=False)
+        .head(top_n.value)
+    )
     _scat2 = (
         alt.Chart(_f)
         .mark_point(opacity=0.3, filled=True, size=26)
         .encode(
             x=alt.X("direct:Q", title="pIC50 direct"),
             y=alt.Y("tdi_condition:Q", title="pIC50 TDI condition"),
-            color=alt.condition("datum.is_TDI", alt.value("#d62728"), alt.value("#bbb")),
+            color=alt.condition(
+                "datum.is_TDI", alt.value("#d62728"), alt.value("#bbb")
+            ),
             tooltip=["Molecule_Name", "SMILES"],
         )
         .properties(width=560, height=400)
@@ -1024,7 +1104,11 @@ def _(alt, classify_batch, df_tdi, iso4_sel, mo, theme_sel, top_n):
     _rank_pts = (
         alt.Chart(_ranked)
         .mark_point(filled=True, size=70, color="#000", opacity=0.6)
-        .encode(x="direct:Q", y="tdi_condition:Q", tooltip=["Molecule_Name", "shift"])
+        .encode(
+            x="direct:Q",
+            y="tdi_condition:Q",
+            tooltip=["Molecule_Name", "shift"],
+        )
     )
     mo.vstack(
         [
@@ -1036,7 +1120,13 @@ def _(alt, classify_batch, df_tdi, iso4_sel, mo, theme_sel, top_n):
             mo.ui.altair_chart(_scat2 + _rank_pts),
             mo.ui.table(
                 _ranked[
-                    ["Molecule_Name", "SMILES", "direct", "tdi_condition", "shift"]
+                    [
+                        "Molecule_Name",
+                        "SMILES",
+                        "direct",
+                        "tdi_condition",
+                        "shift",
+                    ]
                 ],
                 selection=None,
                 page_size=10,
@@ -1061,9 +1151,9 @@ def _(mo):
       to a detectable TDI‑arm effect (`TDI > 4.3`).
     - The full 2‑branch rule **reproduces every shipped label exactly (100%)**.
 
-    Next: the **CYP TDI Investigator** notebook will use this to pick a strong,
-    chemically interesting CYP3A4 TDI‑positive flagship compound and walk the
-    observation → hypothesis → design → experiment arc.
+    The **appendix** below holds the supporting analyses — dataset shape, label
+    derivation & validation, the shift distribution and the flagship‑candidate
+    scanner.
     """)
     return
 

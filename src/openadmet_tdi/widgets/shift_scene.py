@@ -18,5 +18,5 @@ _WIDGET_DIR = pathlib.Path(__file__).resolve().parent
 class ShiftScene(anywidget.AnyWidget):
     """Interactive 'instant vs pre-incubated read' dose–response slider."""
 
-    _esm = (_WIDGET_DIR / "shift_scene.js").read_text(encoding="utf-8")
-    _css = (_WIDGET_DIR / "shift_scene.css").read_text(encoding="utf-8")
+    _esm = str(_WIDGET_DIR / "shift_scene.js")
+    _css = str(_WIDGET_DIR / "shift_scene.css")

@@ -44,7 +44,7 @@ def get_icon_uris(icon_dir: pathlib.Path | None = None, names: tuple[str, ...] |
 class DDIScene(anywidget.AnyWidget):
     """Interactive 'drug–drug interaction' scene built from bioicons."""
 
-    _esm = (_WIDGET_DIR / "ddi_scene.js").read_text(encoding="utf-8")
-    _css = (_WIDGET_DIR / "ddi_scene.css").read_text(encoding="utf-8")
+    _esm = str(_WIDGET_DIR / "ddi_scene.js")
+    _css = str(_WIDGET_DIR / "ddi_scene.css")
 
     icon_uris = traitlets.Dict(default_value=get_icon_uris()).tag(sync=True)

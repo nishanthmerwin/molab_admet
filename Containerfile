@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates ripgrep procps less unzip openssh-client \
+    libxrender1 libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI

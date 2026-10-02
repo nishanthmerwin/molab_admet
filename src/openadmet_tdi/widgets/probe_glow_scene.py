@@ -21,8 +21,8 @@ _WIDGET_DIR = pathlib.Path(__file__).resolve().parent
 class ProbeGlowScene(anywidget.AnyWidget):
     """Interactive 'caged probe → glowing product → signal' readout scene."""
 
-    _esm = (_WIDGET_DIR / "probe_glow_scene.js").read_text(encoding="utf-8")
-    _css = (_WIDGET_DIR / "probe_glow_scene.css").read_text(encoding="utf-8")
+    _esm = str(_WIDGET_DIR / "probe_glow_scene.js")
+    _css = str(_WIDGET_DIR / "probe_glow_scene.css")
 
     icon_uris = traitlets.Dict(
         default_value=get_icon_uris(names=("enzyme_yellow",))

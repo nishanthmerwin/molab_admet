@@ -9,8 +9,8 @@ export function render({ model, el }) {
 
   const dot = () => `
     <svg class="pg-dot" viewBox="0 0 20 20" role="img" aria-label="fluorescent product">
-      <circle cx="10" cy="10" r="5" fill="#4ade80"/>
-      <circle cx="10" cy="10" r="8.2" fill="none" stroke="#22c55e" stroke-opacity="0.45" stroke-width="1"/>
+      <circle cx="10" cy="10" r="5" fill="#4ade80" fill-opacity="0.9"/>
+      <circle cx="10" cy="10" r="8.2" fill="none" stroke="#22c55e" stroke-opacity="0.3" stroke-width="1"/>
     </svg>`;
 
   el.innerHTML = `
@@ -82,20 +82,23 @@ export function render({ model, el }) {
     const flow = 0.25 + (activity / 100) * 0.75;
     arrows.forEach((a) => {
       a.style.opacity = String(flow);
-      a.style.animationDuration = `${(1.8 - (activity / 100) * 1.3).toFixed(2)}s`;
+      a.style.setProperty("--pg-flow-speed", `${(1.6 - (activity / 100) * 0.7).toFixed(2)}s`);
     });
   };
 
   const spawn = () => {
-    acc += (activity / 100) * 2.4;
+    acc += (activity / 100) * 0.85;
     while (acc >= 1) {
       acc -= 1;
-      if (well.childElementCount > 26 && well.firstChild) {
+      if (well.childElementCount > 20 && well.firstChild) {
         well.removeChild(well.firstChild);
       }
       const t = document.createElement("span");
       t.innerHTML = dot();
-      const node = t.firstChild;
+      const node = t.firstElementChild;
+      node.style.left = `${(14 + Math.random() * 72).toFixed(1)}%`;
+      node.style.top = `${(14 + Math.random() * 72).toFixed(1)}%`;
+      node.style.animationDuration = `${(2.4 + Math.random() * 1).toFixed(2)}s`;
       node.addEventListener("animationend", () => node.remove());
       well.appendChild(node);
     }
