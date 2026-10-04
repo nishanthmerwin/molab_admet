@@ -13,7 +13,9 @@ dependencies = [
     "polars>=1.44.1",
     "pyarrow>=25.0.1",
     "rdkit>=2026.3.6",
+    "shap>=0.52.0",
     "traitlets>=5.16.1",
+    "xgboost>=3.4.1",
 ]
 
 [build-system]

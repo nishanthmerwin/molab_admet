@@ -30,12 +30,15 @@ def _():
     import os
 
     import altair as alt
+    import numpy as np
     import pandas as pd
+    import shap
+    import xgboost as xgb
 
     DATA_DIR = os.path.join(
         os.path.dirname(__file__), "..", "data", "raw", "openadmet_cyp_challenge"
     )
-    return DATA_DIR, alt, os, pd
+    return DATA_DIR, alt, np, os, pd, shap, xgb
 
 
 @app.cell
@@ -167,7 +170,8 @@ def _(mo):
 
     This notebook is a **deep‑dive into the raw data** — anchored by an
     interactive decision‑boundary explorer (§1) with on‑demand chemical
-    structures.
+    structures, plus a SHAP analysis of which **pharmacophore patterns**
+    drive TDI (§2).
 
     **Epistemic legend:** 🔵 OBSERVED (measured experiment) · 🟠 PREDICTED
     (derived rule / model) · 🟢 PROPOSED (what we could do next).
@@ -550,6 +554,372 @@ def _(mo, scat, scatter_points, structure_html):
             mo.ui.table(_table, selection=None, page_size=10),
         ]
     )
+    return
+
+
+@app.cell
+def _(mo):
+    mo.md(r"""
+    ## 2 · Which pharmacophores drive TDI? (SHAP)
+
+    We featurize each molecule with a **2D pharmacophore fingerprint** rather
+    than Morgan/ECFP: ECFP bits enumerate circular *atom environments*
+    ("aromatic C with an N neighbour at radius 2") — SHAP can rank them, but
+    they are not pharmacophores a chemist can read. Here every bit **is** a
+    readable pattern: 2 or 3 points drawn from the standard feature families
+    (Donor, Acceptor, Aromatic, Hydrophobe, LumpedHydrophobe, PosIonizable,
+    NegIonizable, ZnBinder) at topological-distance bins in **bond counts** —
+    e.g. "Acceptor–Donor @ 5–8 bonds". A gradient-boosted classifier predicts
+    the §1 decision-boundary label from these bits (splits are grouped by
+    molecule to prevent leakage), and TreeSHAP attributes each prediction back
+    to its pharmacophore bits.
+
+    *Caveats:* labels are rule-derived (§1), samples are pooled across
+    isoforms, and discrimination is modest — read this as a **ranked
+    shortlist of candidate pharmacophores**, not causal effects.
+    """)
+    return
+
+
+@app.cell
+def _(ISO, classify_batch, df_tdi, mo, np, os, pd):
+    import rdkit
+    from rdkit import Chem, RDLogger
+    from rdkit.Chem import ChemicalFeatures
+    from rdkit.Chem.Pharm2D import Generate
+    from rdkit.Chem.Pharm2D.SigFactory import SigFactory
+
+    RDLogger.DisableLog("rdApp.*")
+
+    # 2D pharmacophore signature: 2- and 3-point patterns over 8 feature
+    # families, 5 topological-distance bins (bond counts, not Å).
+    _fdef = os.path.join(os.path.dirname(rdkit.__file__), "Data", "BaseFeatures.fdef")
+    PHARM_SIG = SigFactory(
+        ChemicalFeatures.BuildFeatureFactory(_fdef),
+        minPointCount=2,
+        maxPointCount=3,
+        trianglePruneBins=False,
+    )
+    PHARM_SIG.SetBins([(0, 2), (2, 3), (3, 4), (4, 5), (5, 8)])
+    PHARM_SIG.Init()
+
+    with mo.status.spinner(
+        title=f"Computing {PHARM_SIG.GetSigSize():,}-bit pharmacophore fingerprints "
+        "(first run only, cached per molecule)"
+    ):
+        BITS = {
+            _smi: np.asarray(
+                Generate.Gen2DFingerprint(Chem.MolFromSmiles(_smi), PHARM_SIG), np.uint8
+            )
+            for _smi in df_tdi["SMILES"].dropna().unique()
+        }
+
+    # pooled (compound, isoform) samples labelled by the §1 rule
+    _rows = []
+    for _iso in ISO:
+        _out, _rule, *_ = classify_batch(df_tdi, _iso)
+        _sub = df_tdi.loc[_out, ["Molecule_Name", "SMILES"]].copy()
+        _sub["isoform"] = _iso
+        _sub["label"] = _rule.to_numpy()
+        _rows.append(_sub)
+    PHARM_DATA = pd.concat(_rows, ignore_index=True)
+
+    mo.md(
+        f"**{len(BITS):,}** molecules fingerprinted → "
+        f"**{PHARM_SIG.GetSigSize():,}** pharmacophore bits each · "
+        f"**{len(PHARM_DATA):,}** (compound, isoform) samples · "
+        f"TDI rate **{PHARM_DATA.label.mean():.0%}**"
+    )
+    return BITS, Chem, Generate, PHARM_DATA, PHARM_SIG
+
+
+@app.cell
+def _(BITS, PHARM_DATA, mo, np, xgb):
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from sklearn.model_selection import GroupShuffleSplit
+
+    SH_X = np.stack([BITS[s] for s in PHARM_DATA["SMILES"]]).astype(np.float32)
+    _y = PHARM_DATA["label"].astype(int).to_numpy()
+    _tr, SH_TE = next(
+        GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=0).split(
+            SH_X, _y, PHARM_DATA["SMILES"]
+        )
+    )
+    SH_CLF = xgb.XGBClassifier(
+        n_estimators=300,
+        max_depth=4,
+        learning_rate=0.1,
+        subsample=0.9,
+        colsample_bytree=0.5,
+        tree_method="hist",
+        n_jobs=-1,
+        eval_metric="auc",
+        scale_pos_weight=float((_y[_tr] == 0).sum() / (_y[_tr] == 1).sum()),
+        random_state=0,
+    )
+    SH_CLF.fit(SH_X[_tr], _y[_tr])
+    _p = SH_CLF.predict_proba(SH_X[SH_TE])[:, 1]
+    mo.md(
+        f"Hold-out (molecule-grouped): AUROC **{roc_auc_score(_y[SH_TE], _p):.2f}** · "
+        f"average precision **{average_precision_score(_y[SH_TE], _p):.2f}** "
+        f"(base rate {PHARM_DATA.label.mean():.0%}) — modest, as expected for "
+        "rule-derived labels and 0/1 bits, but enough signal to rank "
+        "pharmacophores by SHAP attribution."
+    )
+    return SH_CLF, SH_TE, SH_X
+
+
+@app.cell
+def _(PHARM_SIG, SH_CLF, SH_TE, SH_X, alt, mo, np, pd, shap, theme_sel):
+    alt.theme.enable(theme_sel.value)
+
+    _BINS = [(0, 2), (2, 3), (3, 4), (4, 5), (5, 8)]
+
+    def bit_label(i):
+        feats, *mat = PHARM_SIG.GetBitDescription(i).split("|")
+        names = "-".join(w.replace("Ionizable", "Ion") for w in feats.split())
+        dists = "/".join(
+            f"{_BINS[int(d)][0]}\u2013{_BINS[int(d)][1]}" for d in mat[0].split()
+        )
+        return f"{names} @ {dists} bonds"
+
+    _sub = np.random.RandomState(0).choice(
+        SH_TE, size=min(1500, len(SH_TE)), replace=False
+    )
+    SH_EXPL = shap.TreeExplainer(SH_CLF)
+    SH_SCORES = SH_CLF.predict_proba(SH_X)[:, 1]
+    _sv = SH_EXPL.shap_values(SH_X[_sub].astype(np.float32))
+    _mean, _mag = _sv.mean(0), np.abs(_sv).mean(0)
+    _idx = np.argsort(-_mag)[:15]
+    SH_TOP = pd.DataFrame(
+        {
+            "bit": _idx,
+            "pharmacophore": [bit_label(i) for i in _idx],
+            "mean |SHAP|": _mag[_idx],
+            "signed mean SHAP": _mean[_idx],
+            "direction": np.where(_mean[_idx] > 0, "presence \u2192 TDI", "presence \u2192 non-TDI"),
+            "carrier rate": [float((SH_X[:, i] > 0).mean()) for i in _idx],
+        }
+    )
+    mo.md(
+        "Top 15 pharmacophore bits by mean |SHAP|. Positive attribution means "
+        "**bit presence pushes the prediction toward TDI**; click bars for "
+        "magnitude, sign and how often each bit is switched on across the "
+        "dataset."
+    )
+    return SH_EXPL, SH_SCORES, SH_TOP, bit_label
+
+
+@app.cell
+def _(SH_TOP, alt, theme_sel):
+    alt.theme.enable(theme_sel.value)
+    _bar = (
+        alt.Chart(SH_TOP)
+        .mark_bar()
+        .encode(
+            x=alt.X("mean |SHAP|:Q", title="mean |SHAP| attribution"),
+            y=alt.Y("pharmacophore:N", sort="-x", title=None),
+            color=alt.Color(
+                "direction:N",
+                scale=alt.Scale(
+                    domain=["presence \u2192 TDI", "presence \u2192 non-TDI"],
+                    range=["#d62728", "#1f77b4"],
+                ),
+                title=None,
+            ),
+            tooltip=[
+                alt.Tooltip("pharmacophore:N", title="pharmacophore"),
+                alt.Tooltip("mean |SHAP|:Q", format=".3f"),
+                alt.Tooltip("signed mean SHAP:Q", format=".3f"),
+                alt.Tooltip("carrier rate:Q", format=".1%", title="carrier rate"),
+            ],
+        )
+        .properties(height=380, title="Top pharmacophore bits by SHAP attribution")
+    )
+    _bar
+    return
+
+
+@app.cell
+def _(PHARM_DATA, SH_SCORES, mo, pd):
+    _sc = pd.DataFrame(
+        {"SMILES": PHARM_DATA["SMILES"], "name": PHARM_DATA["Molecule_Name"], "p": SH_SCORES}
+    )
+    _sc = (
+        _sc.groupby("SMILES", as_index=False)
+        .agg({"p": "max", "name": "first"})
+        .sort_values("p", ascending=False)
+    )
+    _opts = {}
+    for _, _r in pd.concat([_sc.head(20), _sc.tail(15)]).iterrows():
+        _opts[f"{_r['name']}  \u00b7  p(TDI) {_r['p']:.2f}"] = _r["SMILES"]
+    mol_src = mo.ui.radio(
+        options={"Dataset molecule": "dataset", "Custom SMILES": "custom"},
+        value="Dataset molecule",
+        inline=True,
+        label="Molecule source",
+    )
+    mol_pick = mo.ui.dropdown(
+        options=_opts,
+        value=next(iter(_opts)),
+        label="Curated: 20 highest- and 15 lowest-scoring dataset molecules",
+        full_width=True,
+    )
+    smi_box = mo.ui.text(
+        value="OC(Cn1cncn1)(Cn2cncn2)c3ccc(F)cc3F",
+        label="Arbitrary SMILES (e.g. paste a candidate)",
+        full_width=True,
+    )
+    mo.vstack([mol_src, mol_pick, smi_box])
+    return mol_pick, mol_src, smi_box
+
+
+@app.cell
+def _(
+    Chem,
+    Generate,
+    PHARM_SIG,
+    SH_EXPL,
+    bit_label,
+    mo,
+    mol_pick,
+    mol_src,
+    np,
+    smi_box,
+):
+    if mol_src.value == "dataset":
+        _smi = mol_pick.value
+    else:
+        _smi = smi_box.value
+    EXPL_MOL = Chem.MolFromSmiles(_smi)
+    if EXPL_MOL is None:
+        EXPL_BITINFO, EXPL_SV = {}, np.zeros(0)
+        bit_sel = mo.ui.multiselect(
+            options={"(no valid molecule)": ""},
+            value=[],
+            label="Pharmacophore bits to highlight",
+            full_width=True,
+        )
+    else:
+        _bi = {}
+        _fp = Generate.Gen2DFingerprint(EXPL_MOL, PHARM_SIG, bitInfo=_bi)
+        EXPL_BITINFO = _bi
+        EXPL_SV = SH_EXPL.shap_values(np.asarray(_fp, np.float32).reshape(1, -1))[0]
+        _on = sorted(
+            ((int(_b), float(EXPL_SV[_b])) for _b in _bi if abs(EXPL_SV[_b]) >= 0.01),
+            key=lambda _t: -abs(_t[1]),
+        )
+        _opts = {f"{bit_label(_b)}  (SHAP {_s:+.2f})": _b for _b, _s in _on[:30]}
+        _fallback = {"(no pharmacophore bits above threshold)": ""}
+        bit_sel = mo.ui.multiselect(
+            options=_opts if _opts else _fallback,
+            value=[],
+            label="Pharmacophore bits to highlight (none selected = SHAP map only)",
+            full_width=True,
+        )
+    bit_sel
+    return EXPL_BITINFO, EXPL_MOL, EXPL_SV, bit_sel
+
+
+@app.cell
+def _(EXPL_BITINFO, EXPL_MOL, EXPL_SV, SH_EXPL, bit_label, bit_sel, mo, np):
+    import matplotlib
+
+    from rdkit.Chem import Draw, rdDepictor
+    from rdkit.Chem.Draw import rdMolDraw2D
+    from rdkit.Geometry import Point2D
+
+    if EXPL_MOL is None:
+        _view = mo.md("**Invalid SMILES** \u2014 try another string.")
+    elif EXPL_MOL.GetNumAtoms() < 2:
+        _view = mo.md("Molecule too small to contour \u2014 needs at least 2 atoms.")
+    else:
+        # net SHAP attribution distributed over the atoms of each ON bit
+        _w = np.zeros(EXPL_MOL.GetNumAtoms())
+        for _b, _occs in EXPL_BITINFO.items():
+            for _occ in _occs:
+                for _pt in _occ:
+                    for _a in _pt:
+                        _w[_a] += EXPL_SV[_b] / (len(_occs) * len(_occ))
+
+        # atoms covered by the selected bits -> single shared highlight colour
+        _hl = set()
+        for _b in bit_sel.value:
+            if _b != "":
+                for _occ in EXPL_BITINFO[int(_b)]:
+                    for _pt in _occ:
+                        _hl.update(_pt)
+        _hb = [
+            _bond.GetIdx()
+            for _bond in EXPL_MOL.GetBonds()
+            if _bond.GetBeginAtomIdx() in _hl and _bond.GetEndAtomIdx() in _hl
+        ]
+
+        # inline the similarity-map drawing so highlights can be passed through
+        _mol = rdMolDraw2D.PrepareMolForDrawing(EXPL_MOL, addChiralHs=False)
+        if not _mol.GetNumConformers():
+            rdDepictor.Compute2DCoords(_mol)
+        _conf = _mol.GetConformer()
+        if _mol.GetNumBonds() > 0:
+            _b0 = _mol.GetBondWithIdx(0)
+            _sigma = 0.3 * (
+                _conf.GetAtomPosition(_b0.GetBeginAtomIdx())
+                - _conf.GetAtomPosition(_b0.GetEndAtomIdx())
+            ).Length()
+        else:
+            _sigma = 0.3 * (
+                _conf.GetAtomPosition(0) - _conf.GetAtomPosition(1)
+            ).Length()
+        _locs = [
+            Point2D(_conf.GetAtomPosition(_i).x, _conf.GetAtomPosition(_i).y)
+            for _i in range(_mol.GetNumAtoms())
+        ]
+        _d2d = Draw.MolDraw2DCairo(450, 400)
+        _ps = Draw.ContourParams()
+        _ps.fillGrid = True
+        _ps.gridResolution = 0.1
+        _ps.extraGridPadding = 0.5
+        _ps.setColourMap(
+            [tuple(_c) for _c in matplotlib.colormaps["RdBu_r"]([0, 0.5, 1])]
+        )
+        _d2d.ClearDrawing()
+        Draw.ContourAndDrawGaussians(
+            _d2d,
+            _locs,
+            _w.tolist(),
+            [round(_sigma, 2)] * _mol.GetNumAtoms(),
+            nContours=5,
+            params=_ps,
+        )
+        _d2d.drawOptions().clearBackground = False
+        _d2d.drawOptions().highlightColour = (1.0, 0.7, 0.0)
+        _d2d.DrawMolecule(_mol, highlightAtoms=sorted(_hl), highlightBonds=_hb)
+        _d2d.FinishDrawing()
+
+        _p = float(1 / (1 + np.exp(-(SH_EXPL.expected_value + EXPL_SV.sum()))))
+        _head = mo.callout(
+            mo.md(
+                f"**Model p(TDI) = {_p:.0%}** \u2014 predicted probability this "
+                "molecule behaves as a time-dependent inhibitor."
+            ),
+            kind="warn" if _p >= 0.5 else "neutral",
+        )
+        if _hl:
+            _cap = mo.md(
+                f"p(TDI) = **{_p:.0%}**. Red = pushed **toward** TDI, blue = away. "
+                "Amber highlights the atoms of: "
+                + "; ".join(bit_label(int(_b)) for _b in bit_sel.value if _b != "")
+                + "."
+            )
+        else:
+            _cap = mo.md(
+                f"p(TDI) = **{_p:.0%}**. Red atoms are pushed **toward** TDI by the "
+                "model, blue **away** \u2014 the per-atom sum of signed SHAP over every "
+                "pharmacophore bit this molecule switches on. Select bits above to "
+                "highlight (amber) where they sit."
+            )
+        _view = mo.vstack([_head, mo.image(_d2d.GetDrawingText(), width=520), _cap])
+    _view
     return
 
 
