@@ -8,13 +8,17 @@ dependencies = [
     "anywidget>=0.11.0",
     "marimo>=0.15.4",
     "marimo-chem-utils>=0.2.4",
+    "matplotlib>=3.11.2",
+    "numpy>=2.3.5",
     "pandas>=3.0.5",
     "plotly>=7.0.0",
     "polars>=1.44.1",
     "pyarrow>=25.0.1",
     "rdkit>=2026.3.6",
+    "scikit-learn>=1.9.1",
     "shap>=0.52.0",
     "traitlets>=5.16.1",
+    "useful-rdkit-utils>=0.96",
     "xgboost>=3.4.1",
 ]
 

@@ -30,16 +30,16 @@ export function render({ model, el }) {
   el.innerHTML = `
     <div class="sc-card">
       <div class="sc-head">
-        <div class="sc-title">The instant read vs the pre-incubated read</div>
+        <div class="sc-title">One compound, two arms: &minus;NADPH vs +NADPH</div>
         <label class="sc-toggle">
           <input type="checkbox" id="sc-pre"/>
           <span class="sc-knob"></span>
-          <span class="sc-toggle-label">Pre-incubate 30 min (+NADPH)</span>
+          <span class="sc-toggle-label">TDI arm &mdash; 30 min pre-incubation, +NADPH</span>
         </label>
       </div>
 
       <svg class="sc-chart" viewBox="0 0 560 158" preserveAspectRatio="xMidYMid meet" role="img"
-           aria-label="Dose-response curve of residual enzyme activity, sliding left after pre-incubation">
+           aria-label="Dose-response curve of residual enzyme activity, sliding left in the +NADPH arm">
         <text x="8" y="11" class="sc-svg-text">% enzyme activity left</text>
         ${grid}
         <line x1="48" y1="120" x2="544" y2="120" class="sc-axis"></line>
@@ -57,12 +57,12 @@ export function render({ model, el }) {
       <div class="sc-readout">
         <span class="sc-chip">pIC50 <b id="sc-pic50">4.40</b></span>
         <span class="sc-chip">IC50 &asymp; <b id="sc-ic50">40</b> &micro;M</span>
-        <span class="sc-verdict sc-v-off">instant screen: looks clean &mdash; TDI missed</span>
-        <span class="sc-verdict sc-v-on">after pre-incubation: TDI detected &#10003;</span>
+        <span class="sc-verdict sc-v-off">direct arm (&minus;NADPH): plain reversible inhibition</span>
+        <span class="sc-verdict sc-v-on">+NADPH arm: TDI detected &#10003;</span>
       </div>
 
-      <div class="sc-cap sc-cap-off">Measured straight away, the compound has barely disabled any enzyme &mdash; it would sail through a conventional instantaneous screen.</div>
-      <div class="sc-cap sc-cap-on">While it sits with active CYP for 30 minutes, it disables more and more enzyme &mdash; the dose&ndash;response measured afterwards has slid left across the hit threshold.</div>
+      <div class="sc-cap sc-cap-off">Pre-incubated 30 min without NADPH, the enzyme can&#8217;t turn the compound over &mdash; you measure only plain, reversible binding of the parent compound, and the TDI is invisible.</div>
+      <div class="sc-cap sc-cap-on">With NADPH in the pre-incubation, the enzyme metabolises the compound and progressively disables itself &mdash; the dose&ndash;response, measured afterwards from both arms (probe + NADPH added to each), has slid left across the hit threshold.</div>
     </div>`;
 
   const toggle = el.querySelector("#sc-pre");

@@ -9,3 +9,7 @@ __marimo__/
 .opencode-data/
 
 tmp/*
+!notebooks/__marimo__/
+!notebooks/__marimo__/**
+
+.DS_Store
