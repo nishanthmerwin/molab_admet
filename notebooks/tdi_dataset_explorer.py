@@ -118,6 +118,9 @@ def _(mo):
     **Data:** [`openadmet/cyp-challenge-train-test`](https://huggingface.co/datasets/openadmet/cyp-challenge-train-test)
     · OpenADMET CYP Inhibition Blind Challenge · **License:** Apache‑2.0
 
+    **Author:** Nishanth Merwin ·
+    **Acknowledgements:** Jeremy Monat for reviewing the notebook.
+
     *Transparency: LLMs wrote ~99% of the code here (and drafted most of the
     prose); the author directed the analysis, reviewed everything, and takes
     responsibility for the content.*
