@@ -1,5 +1,7 @@
 # molab_admet
 
+[![Open in molab](https://img.shields.io/badge/Open_in-molab-F9A03F?logo=marimo&logoColor=white)](https://molab.marimo.io/github/nishanthmerwin/molab_admet/blob/main/notebooks/tdi_dataset_explorer.py)
+
 Sandboxed Linux dev environment for agentic marimo notebook development, running
 via [apple/container](https://github.com/apple/container) microVMs on macOS.
 The agent (OpenCode) runs *inside* the container; you interact from your
