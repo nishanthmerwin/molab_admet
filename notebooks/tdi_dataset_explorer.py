@@ -110,77 +110,6 @@ def _():
 
 
 @app.cell
-def _(alt):
-    _base_axis = dict(
-        labelFont="Inter, sans-serif",
-        labelFontSize=13,
-        titleFont="Inter, sans-serif",
-        titleFontSize=13,
-        gridColor="#e5e7eb",
-        gridWidth=0.6,
-    )
-
-    @alt.theme.register("Default", enable=True)
-    def _default():
-        return {}
-
-    @alt.theme.register("Clean", enable=True)
-    def _clean():
-        return {
-            "background": "#ffffff",
-            "font": "Inter, sans-serif",
-            "view": {"stroke": "transparent"},
-            "axis": {**_base_axis, "grid": True},
-            "axisX": {"domain": True, "domainColor": "#cbd5e1", "domainWidth": 1.2},
-            "axisY": {"domain": False},
-            "legend": {"titleFontSize": 13, "labelFontSize": 12, "labelLimit": 260},
-        }
-
-    @alt.theme.register("Paper", enable=True)
-    def _paper():
-        return {
-            "background": "#faf9f6",
-            "font": "Georgia, serif",
-            "title": {"font": "Georgia, serif", "fontSize": 17, "color": "#1f2937"},
-            "view": {"stroke": "#d1d5db", "strokeWidth": 1},
-            "axis": {
-                **_base_axis,
-                "labelFont": "Georgia, serif",
-                "titleFont": "Georgia, serif",
-                "grid": True,
-                "gridColor": "#e7e5e4",
-            },
-            "axisX": {"domain": True, "tickColor": "#d1d5db"},
-            "legend": {"labelFont": "Georgia, serif", "titleFont": "Georgia, serif"},
-        }
-
-    @alt.theme.register("Ink (dark)", enable=True)
-    def _ink():
-        return {
-            "background": "#0f1115",
-            "font": "Inter, sans-serif",
-            "title": {"color": "#f9fafb"},
-            "view": {"stroke": "transparent"},
-            "axis": {
-                **_base_axis,
-                "labelColor": "#d1d5db",
-                "titleColor": "#e5e7eb",
-                "grid": True,
-                "gridColor": "#1f2937",
-                "gridDash": [2, 2],
-            },
-            "axisX": {"domain": True, "domainColor": "#374151", "tickColor": "#374151"},
-            "legend": {
-                "labelColor": "#d1d5db",
-                "titleColor": "#e5e7eb",
-                "labelFontSize": 12,
-            },
-        }
-
-    return
-
-
-@app.cell
 def _(mo):
     mo.md(r"""
     # Understanding & exploring drug–drug interactions with OpenADMET
@@ -211,17 +140,6 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    theme_sel = mo.ui.radio(
-        options=["Default", "Clean", "Paper", "Ink (dark)"],
-        value="Clean",
-        label="Chart style — switch to re-render every chart",
-        inline=True,
-    )
-    return (theme_sel,)
-
-
-@app.cell
-def _(mo):
     mo.md(r"""
     ## 0 · The assay, told by its widgets
 
@@ -246,7 +164,7 @@ def _():
         "pill_blue": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2aWV3Qm94PSIwIDAgMzEuNDYgMTIuNjMiPjxkZWZzPjxzdHlsZT4uY2xzLTEsLmNscy0ye3N0cm9rZTojMjMxZjIwO3N0cm9rZS13aWR0aDowLjI5cHg7fS5jbHMtMXtzdHJva2UtbWl0ZXJsaW1pdDoxMDtmaWxsOnVybCgjbGluZWFyLWdyYWRpZW50KTt9LmNscy0ye3N0cm9rZS1saW5lY2FwOnJvdW5kO3N0cm9rZS1saW5lam9pbjpyb3VuZDtmaWxsOnVybCgjbGluZWFyLWdyYWRpZW50LTIpO308L3N0eWxlPjxsaW5lYXJHcmFkaWVudCBpZD0ibGluZWFyLWdyYWRpZW50IiB4MT0iLTEyMi43NCIgeTE9Ii01Ni44NSIgeDI9Ii0xMjIuNzQiIHkyPSItNjcuMjkiIGdyYWRpZW50VHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTM4LjQ3IDY4LjQxKSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPjxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzQzYWVlMyIvPjxzdG9wIG9mZnNldD0iMC4wMyIgc3RvcC1jb2xvcj0iIzQyYWFlMSIvPjxzdG9wIG9mZnNldD0iMC40OSIgc3RvcC1jb2xvcj0iIzM2NmJiNyIvPjxzdG9wIG9mZnNldD0iMC44MyIgc3RvcC1jb2xvcj0iIzJlNDM5ZCIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzJiMzQ5MyIvPjwvbGluZWFyR3JhZGllbnQ+PGxpbmVhckdyYWRpZW50IGlkPSJsaW5lYXItZ3JhZGllbnQtMiIgeDE9Ii0xMTUuNTYiIHkxPSItNTYuODUiIHgyPSItMTE1LjU2IiB5Mj0iLTY3LjI5IiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KC0xLCAtMC4wOSwgMC4wOSwgLTEsIC0xMDEuMDQsIC02Ni4zNCkiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmYiLz48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNmZmYiLz48c3RvcCBvZmZzZXQ9IjAuMzgiIHN0b3AtY29sb3I9IiNlNmU4ZWIiLz48c3RvcCBvZmZzZXQ9IjAuNzIiIHN0b3AtY29sb3I9IiNkNmRiZGUiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiNkMWQ2ZGEiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48ZyBpZD0iTGF5ZXJfMiIgZGF0YS1uYW1lPSJMYXllciAyIj48ZyBpZD0iQWJiaWxkdW5nXzEiIGRhdGEtbmFtZT0iQWJiaWxkdW5nIDEiPjxnIGlkPSJEcnVnX3NjcmVlbmluZyIgZGF0YS1uYW1lPSJEcnVnIHNjcmVlbmluZyI+PHJlY3QgY2xhc3M9ImNscy0xIiB4PSIwLjEiIHk9IjEuMTIiIHdpZHRoPSIzMS4yNSIgaGVpZ2h0PSIxMC40NCIgcng9IjUuMjIiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLjg0IDE0LjA1KSByb3RhdGUoLTE3NC45MykiLz48cGF0aCBjbGFzcz0iY2xzLTIiIGQ9Ik0xNC42OCwxMS40OWE4LjUyLDguNTIsMCwwLDAsLjkyLTEwLjRMNS4xNC4xNkMuNzEtLjI0LTIuOTUsNy45LDQuMjgsMTAuNTNaIi8+PC9nPjwvZz48L2c+PC9zdmc+",
     }
 
-    DDI_ESM = r"""\
+    DDI_ESM = r"""
     export function render({ model, el }) {
       const ic = model.get("icon_uris") || {};
 
@@ -385,7 +303,7 @@ def _():
       setPile(2, false);
     }
     """
-    DDI_CSS = r"""\
+    DDI_CSS = r"""
     .ddi-card {
       font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
@@ -939,7 +857,7 @@ def _():
       }
     }
     """
-    PROBE_ESM = r"""\
+    PROBE_ESM = r"""
     export function render({ model, el }) {
       const ic = model.get("icon_uris") || {};
 
@@ -1014,7 +932,7 @@ def _():
         const x = -1 + ((v - 1) / 99) * 3;
         const act = 100 / (1 + Math.pow(10, 0.9 * (x - 1)));
         const uM = Math.pow(10, x);
-        const lbl = uM >= 1 ? `${Math.round(uM)} \u00b5M` : `${uM.toFixed(2)} \u00b5M`;
+        const lbl = uM >= 1 ? `${Math.round(uM)} µM` : `${uM.toFixed(2)} µM`;
         return { act, lbl };
       };
 
@@ -1059,7 +977,7 @@ def _():
       }, 150);
     }
     """
-    PROBE_CSS = r"""\
+    PROBE_CSS = r"""
     .pg-card {
       font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
@@ -1347,7 +1265,7 @@ def _():
       }
     }
     """
-    SHIFT_ESM = r"""\
+    SHIFT_ESM = r"""
     export function render({ model, el }) {
       const X0 = -2, X1 = 2, NHILL = 0.9;
       const PL_X = 48, PL_W = 496, PL_Y = 120, PL_H = 102;
@@ -1456,7 +1374,7 @@ def _():
       draw();
     }
     """
-    SHIFT_CSS = r"""\
+    SHIFT_CSS = r"""
     .sc-card {
       font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
       background: linear-gradient(180deg, #ffffff, #f8fafc);
@@ -1800,13 +1718,13 @@ def _(MMD_THEME, mo):
 @app.cell
 def _(mo):
     mo.md(r"""
-    ### Instant screens miss TDI \u2014 the +NADPH pre\u2011incubation is the point
+    ### Instant screens miss TDI — the +NADPH pre‑incubation is the point
 
-    Read the compound straight away \u2014 or pre\u2011incubate it without NADPH \u2014 and
-    a time\u2011dependent inhibitor looks **clean**: the enzyme has had no chance
+    Read the compound straight away — or pre‑incubate it without NADPH — and
+    a time‑dependent inhibitor looks **clean**: the enzyme has had no chance
     to turn it over, so only plain reversible binding shows up. The damage
-    **builds during the +NADPH pre\u2011incubation** as metabolism converts the
-    compound into an inactivator, so the dose\u2013response measured afterwards
+    **builds during the +NADPH pre‑incubation** as metabolism converts the
+    compound into an inactivator, so the dose–response measured afterwards
     has already slid left. Flip the toggle below to watch one compound go
     from "sails through" to "flagged" as you switch arms.
     """)
@@ -1904,9 +1822,7 @@ def _(
     only_pos,
     pd,
     structure_uri,
-    theme_sel,
 ):
-    alt.theme.enable(theme_sel.value)
     _iso = iso_sel.value
     _out, _rule, _direct, _tdi, _shift = classify_batch(df_tdi, _iso)
     _lab = f"{_iso}_is_TDI"
@@ -2137,16 +2053,14 @@ def _(BITS, PHARM_DATA, mo, np, xgb):
 
 
 @app.cell
-def _(PHARM_SIG, SH_CLF, SH_TE, SH_X, alt, mo, np, pd, shap, theme_sel):
-    alt.theme.enable(theme_sel.value)
-
+def _(PHARM_SIG, SH_CLF, SH_TE, SH_X, mo, np, pd, shap):
     _BINS = [(0, 2), (2, 3), (3, 4), (4, 5), (5, 8)]
 
     def bit_label(i):
         feats, *mat = PHARM_SIG.GetBitDescription(i).split("|")
         names = "-".join(w.replace("Ionizable", "Ion") for w in feats.split())
         dists = "/".join(
-            f"{_BINS[int(d)][0]}\u2013{_BINS[int(d)][1]}" for d in mat[0].split()
+            f"{_BINS[int(d)][0]}–{_BINS[int(d)][1]}" for d in mat[0].split()
         )
         return f"{names} @ {dists} bonds"
 
@@ -2164,7 +2078,7 @@ def _(PHARM_SIG, SH_CLF, SH_TE, SH_X, alt, mo, np, pd, shap, theme_sel):
             "pharmacophore": [bit_label(i) for i in _idx],
             "mean |SHAP|": _mag[_idx],
             "signed mean SHAP": _mean[_idx],
-            "direction": np.where(_mean[_idx] > 0, "presence \u2192 TDI", "presence \u2192 non-TDI"),
+            "direction": np.where(_mean[_idx] > 0, "presence → TDI", "presence → non-TDI"),
             "carrier rate": [float((SH_X[:, i] > 0).mean()) for i in _idx],
         }
     )
@@ -2178,8 +2092,7 @@ def _(PHARM_SIG, SH_CLF, SH_TE, SH_X, alt, mo, np, pd, shap, theme_sel):
 
 
 @app.cell
-def _(SH_TOP, alt, theme_sel):
-    alt.theme.enable(theme_sel.value)
+def _(SH_TOP, alt):
     _bar = (
         alt.Chart(SH_TOP)
         .mark_bar()
@@ -2189,7 +2102,7 @@ def _(SH_TOP, alt, theme_sel):
             color=alt.Color(
                 "direction:N",
                 scale=alt.Scale(
-                    domain=["presence \u2192 TDI", "presence \u2192 non-TDI"],
+                    domain=["presence → TDI", "presence → non-TDI"],
                     range=["#d62728", "#1f77b4"],
                 ),
                 title=None,
@@ -2219,7 +2132,7 @@ def _(PHARM_DATA, SH_SCORES, mo, pd):
     )
     _opts = {}
     for _, _r in pd.concat([_sc.head(20), _sc.tail(15)]).iterrows():
-        _opts[f"{_r['name']}  \u00b7  p(TDI) {_r['p']:.2f}"] = _r["SMILES"]
+        _opts[f"{_r['name']}  ·  p(TDI) {_r['p']:.2f}"] = _r["SMILES"]
     mol_src = mo.ui.radio(
         options={"Dataset molecule": "dataset", "Custom SMILES": "custom"},
         value="Dataset molecule",
@@ -2297,9 +2210,9 @@ def _(EXPL_BITINFO, EXPL_MOL, EXPL_SV, SH_EXPL, bit_label, bit_sel, mo, np):
     from rdkit.Geometry import Point2D
 
     if EXPL_MOL is None:
-        _view = mo.md("**Invalid SMILES** \u2014 try another string.")
+        _view = mo.md("**Invalid SMILES** — try another string.")
     elif EXPL_MOL.GetNumAtoms() < 2:
-        _view = mo.md("Molecule too small to contour \u2014 needs at least 2 atoms.")
+        _view = mo.md("Molecule too small to contour — needs at least 2 atoms.")
     else:
         # net SHAP attribution distributed over the atoms of each ON bit
         _w = np.zeros(EXPL_MOL.GetNumAtoms())
@@ -2366,7 +2279,7 @@ def _(EXPL_BITINFO, EXPL_MOL, EXPL_SV, SH_EXPL, bit_label, bit_sel, mo, np):
         _p = float(1 / (1 + np.exp(-(SH_EXPL.expected_value + EXPL_SV.sum()))))
         _head = mo.callout(
             mo.md(
-                f"**Model p(TDI) = {_p:.0%}** \u2014 predicted probability this "
+                f"**Model p(TDI) = {_p:.0%}** — predicted probability this "
                 "molecule behaves as a time-dependent inhibitor."
             ),
             kind="warn" if _p >= 0.5 else "neutral",
@@ -2381,7 +2294,7 @@ def _(EXPL_BITINFO, EXPL_MOL, EXPL_SV, SH_EXPL, bit_label, bit_sel, mo, np):
         else:
             _cap = mo.md(
                 f"p(TDI) = **{_p:.0%}**. Red atoms are pushed **toward** TDI by the "
-                "model, blue **away** \u2014 the per-atom sum of signed SHAP over every "
+                "model, blue **away** — the per-atom sum of signed SHAP over every "
                 "pharmacophore bit this molecule switches on. Select bits above to "
                 "highlight (amber) where they sit."
             )
